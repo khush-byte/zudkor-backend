@@ -2,53 +2,59 @@ package com.zudkor.app.controller;
 
 import com.zudkor.app.entity.User;
 import com.zudkor.app.repository.UserRepository;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
 
-    private final UserRepository userRepository;
+    @Autowired
+    private UserRepository userRepository;
 
-    public UserController(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
-    // 🔹 Получить всех пользователей
-    @GetMapping
-    public List<User> getAll() {
-        return userRepository.findAll();
-    }
-
-    // 🔹 Получить пользователя по ID
-    @GetMapping("/{id}")
-    public User getById(@PathVariable Long id) {
-        return userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-    }
-
-    // 🔹 Создать нового пользователя
+    // Регистрация пользователя без аутентификации
     @PostMapping
-    public User create(@RequestBody User user) {
-        return userRepository.save(user);
+    public ResponseEntity<?> createUser(@RequestBody User user) {
+        // Проверяем email
+        if (userRepository.existsByEmail(user.getEmail())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("error", "Email уже используется"));
+        }
+
+        // Проверяем username
+        if (userRepository.existsByUsername(user.getUsername())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("error", "Username уже используется"));
+        }
+
+        // Хешируем пароль
+        user.setPasswordHash(passwordEncoder.encode(user.getPasswordHash()));
+
+        // Сохраняем пользователя
+        User saved = userRepository.save(user);
+        return ResponseEntity.ok(saved);
     }
 
-    // 🔹 Обновить пользователя
-    @PutMapping("/{id}")
-    public User update(@PathVariable Long id, @RequestBody User user) {
-        User existing = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-        existing.setUsername(user.getUsername());
-        existing.setPassword(user.getPassword());
-        existing.setRole(user.getRole());
-        return userRepository.save(existing);
+    @GetMapping
+    public ResponseEntity<?> getAllUsers() {
+        return ResponseEntity.ok(userRepository.findAll());
     }
 
-    // 🔹 Удалить пользователя
-    @DeleteMapping("/{id}")
-    public void delete(@PathVariable Long id) {
-        userRepository.deleteById(id);
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getUserById(@PathVariable UUID id) {
+        return userRepository.findById(id)
+                .<ResponseEntity<?>>map(user -> ResponseEntity.ok(user))  // явно указываем, что это ResponseEntity<?>
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Пользователь не найден")));
     }
 }
