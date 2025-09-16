@@ -18,16 +18,14 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf
-                .ignoringRequestMatchers(request -> 
-                    "/api/users".equals(request.getRequestURI()) &&
-                    HttpMethod.POST.matches(request.getMethod())
-                )
-            )
+            .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                 // Разрешаем регистрацию без авторизации
                 .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
+                .requestMatchers("/error").permitAll()
+                .requestMatchers("/api/health").permitAll()
                 // Все остальные эндпоинты требуют Basic Auth
+                .requestMatchers("/api/**").authenticated()
                 .anyRequest().authenticated()
             )
             .httpBasic(Customizer.withDefaults());
