@@ -6,9 +6,10 @@ import com.zudkor.app.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
-
+import org.springframework.security.core.Authentication;
 import java.util.Map;
 import java.util.UUID;
 
@@ -99,13 +100,34 @@ public class UserController {
                     .body(Map.of("error", "Пользователь не найден")));
     }
 
-    // 🔹 Удалить пользователя
+    // 🔹 Удалить пользователя для Админ
+    // @DeleteMapping("/{id}")
+    // public ResponseEntity<?> deleteUser(@PathVariable UUID id) {
+    //     return userRepository.findById(id)
+    //             .map(user -> {
+    //                 userRepository.delete(user);
+    //                 return ResponseEntity.noContent().build();
+    //             })
+    //             .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+    //                     .body(Map.of("error", "Пользователь не найден")));
+    // }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteUser(@PathVariable UUID id) {
+        // Получаем username текущего пользователя
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String currentUsername = auth.getName();
+
         return userRepository.findById(id)
                 .map(user -> {
+                    // Проверяем, совпадает ли пользователь
+                    if (!user.getUsername().equals(currentUsername)) {
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                                .body(Map.of("error", "Вы можете удалить только себя"));
+                    }
+
                     userRepository.delete(user);
-                    return ResponseEntity.noContent().build();
+                    return ResponseEntity.ok(Map.of("message", "Пользователь успешно удалён"));
                 })
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(Map.of("error", "Пользователь не найден")));
